@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f5f6f8" />
+    <meta name="description" content="A private, read-only Markdown viewer for Windows and the web." />
+    <title>Markdown Viewer</title>
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./style.css" />
+    <script defer src="./vendor/markdown-it.min.js"></script>
+    <script defer src="./vendor/purify.min.js"></script>
+    <script defer src="./app.js"></script>
+  </head>
+  <body>
+    <div class="app-shell" id="dropZone">
+      <header class="topbar">
+        <a class="brand" href="./" aria-label="Markdown Viewer home">
+          <img src="./icon.svg" alt="" />
+          <span>Markdown Viewer</span>
+        </a>
+        <span class="file-name" id="fileName" aria-live="polite"></span>
+        <div class="top-actions">
+          <span class="local-badge" data-i18n="private">Local only</span>
+          <button class="icon-button" id="themeButton" type="button" data-i18n-title="theme" aria-label="Toggle theme" title="Toggle theme">◐</button>
+          <select id="languageSelect" aria-label="Language">
+            <option value="en">English</option>
+            <option value="ko">한국어</option>
+          </select>
+          <button class="primary-button" id="openButton" type="button" data-i18n="open">Open file</button>
+        </div>
+      </header>
+
+      <div class="toolbar" id="toolbar" hidden>
+        <div class="view-switch" role="group" aria-label="View mode">
+          <button id="previewButton" class="selected" type="button" data-i18n="preview">Preview</button>
+          <button id="sourceButton" type="button" data-i18n="source">Source</button>
+        </div>
+        <div class="toolbar-spacer"></div>
+        <div class="search-group" id="searchGroup">
+          <input id="searchInput" type="search" data-i18n-placeholder="search" placeholder="Find in document" aria-label="Find in document" />
+          <span id="searchCount" aria-live="polite"></span>
+          <button id="previousButton" type="button" aria-label="Previous match" title="Previous match">↑</button>
+          <button id="nextButton" type="button" aria-label="Next match" title="Next match">↓</button>
+        </div>
+        <button class="outline-toggle" id="outlineButton" type="button" data-i18n="outline">Outline</button>
+      </div>
+
+      <main class="main-area" id="mainArea">
+        <section class="welcome" id="welcome">
+          <div class="welcome-mark"><img src="./icon.svg" alt="" /></div>
+          <p class="eyebrow" data-i18n="eyebrow">A clear place to read</p>
+          <h1 data-i18n="welcomeTitle">Your Markdown, beautifully readable.</h1>
+          <p class="welcome-copy" data-i18n="welcomeCopy">Open a .md file or drop it here. Your document stays on this device.</p>
+          <button class="primary-button large" id="welcomeOpenButton" type="button" data-i18n="choose">Choose a Markdown file</button>
+          <p class="welcome-hint" data-i18n="formats">Supports .md and .markdown · UTF-8 · Up to 10 MB</p>
+          <input id="fileInput" type="file" accept=".md,.markdown,text/markdown" hidden />
+        </section>
+
+        <div class="reader" id="reader" hidden>
+          <aside class="outline" id="outlinePanel" aria-label="Document outline">
+            <div class="outline-heading" data-i18n="onThisPage">On this page</div>
+            <nav id="outlineList"></nav>
+          </aside>
+          <div class="document-scroller" id="documentScroller">
+            <article class="markdown-body" id="preview" aria-label="Markdown preview"></article>
+            <pre class="source-body" id="source" hidden><code id="sourceText"></code></pre>
+            <footer class="document-footer" id="documentFooter"></footer>
+          </div>
+        </div>
+      </main>
+
+      <div class="drop-overlay" id="dropOverlay" hidden><span data-i18n="drop">Drop Markdown file to open</span></div>
+      <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+    </div>
+  </body>
+</html>
