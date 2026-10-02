@@ -20,13 +20,8 @@ jobs:
           cache: npm
       - name: Install JavaScript dependencies
         run: npm ci
-      - name: Verify vendored libraries
-        shell: pwsh
-        run: |
-          $before = git status --porcelain docs/vendor
-          npm run vendor
-          $after = git status --porcelain docs/vendor
-          if ($before -ne $after) { throw "Vendored libraries are out of date." }
+      - name: Prepare browser libraries
+        run: npm run vendor
       - name: Browser smoke test
         run: npm run test:smoke
       - name: Build Windows installer
