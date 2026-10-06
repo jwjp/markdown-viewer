@@ -34,6 +34,31 @@ try {
   assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark');
   await page.screenshot({ path: '.test-artifacts/viewer-smoke.png', fullPage: true });
   assert.deepEqual(errors, []);
+
+  const updatePage = await browser.newPage();
+  await updatePage.addInitScript(() => {
+    window.updateCalls = [];
+    window.__TAURI__ = {
+      core: {
+        invoke: async (command) => {
+          window.updateCalls.push(command);
+          if (command === 'startup_document') return null;
+          if (command === 'prepare_update') return '0.1.2';
+          if (command === 'install_update') return null;
+          throw new Error(`Unexpected command: ${command}`);
+        }
+      }
+    };
+  });
+  await updatePage.goto(pathToFileURL(resolve('docs/index.html')).href);
+  await updatePage.locator('#updateInstallButton:visible').waitFor();
+  assert.equal(await updatePage.locator('#updateMessage').textContent(), 'Version 0.1.2 is ready to install.');
+  await updatePage.screenshot({ path: '.test-artifacts/update-preview.png', fullPage: true });
+  await updatePage.locator('#languageSelect').selectOption('ko');
+  assert.equal(await updatePage.locator('#updateMessage').textContent(), '버전 0.1.2 업데이트를 설치할 수 있습니다.');
+  await updatePage.locator('#updateInstallButton').click();
+  assert.deepEqual(await updatePage.evaluate(() => window.updateCalls), ['startup_document', 'prepare_update', 'install_update']);
+  assert.equal(await updatePage.locator('#updateMessage').textContent(), '업데이트를 설치하는 중…');
   console.log('Browser smoke test passed.');
 } finally {
   await browser.close();

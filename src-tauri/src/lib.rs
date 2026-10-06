@@ -1,12 +1,17 @@
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    sync::Mutex,
+};
 
 use base64::{engine::general_purpose::STANDARD, Engine};
-use tauri::State;
+use tauri::{Manager, State};
+use tauri_plugin_updater::{Update, UpdaterExt};
 
 const MAX_DOCUMENT_BYTES: u64 = 10 * 1024 * 1024;
 const MAX_IMAGE_BYTES: u64 = 8 * 1024 * 1024;
 
 struct StartupFile(Option<PathBuf>);
+struct ReadyUpdate(Mutex<Option<(Update, Vec<u8>)>>);
 
 fn is_markdown(path: &Path) -> bool {
     path.extension()
@@ -18,7 +23,9 @@ fn read_document_path(path: &Path) -> Result<Document, String> {
     if !is_markdown(path) {
         return Err("Choose a .md or .markdown file".into());
     }
-    let size = std::fs::metadata(path).map_err(|error| error.to_string())?.len();
+    let size = std::fs::metadata(path)
+        .map_err(|error| error.to_string())?
+        .len();
     if size > MAX_DOCUMENT_BYTES {
         return Err("The document exceeds the 10 MB limit".into());
     }
@@ -29,7 +36,11 @@ fn read_document_path(path: &Path) -> Result<Document, String> {
         .to_string();
     let canonical = path.canonicalize().map_err(|error| error.to_string())?;
     Ok(Document {
-        name: path.file_name().unwrap_or_default().to_string_lossy().into_owned(),
+        name: path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .into_owned(),
         path: canonical.to_string_lossy().into_owned(),
         text,
     })
@@ -44,7 +55,11 @@ struct Document {
 
 #[tauri::command]
 fn startup_document(state: State<'_, StartupFile>) -> Result<Option<Document>, String> {
-    state.0.as_ref().map(|path| read_document_path(path)).transpose()
+    state
+        .0
+        .as_ref()
+        .map(|path| read_document_path(path))
+        .transpose()
 }
 
 #[tauri::command]
@@ -64,23 +79,60 @@ fn read_relative_image(document_path: String, image_path: String) -> Result<Stri
         .parent()
         .ok_or("Invalid document path")?
         .to_path_buf();
-    let image = base.join(image_path).canonicalize().map_err(|error| error.to_string())?;
+    let image = base
+        .join(image_path)
+        .canonicalize()
+        .map_err(|error| error.to_string())?;
     if !image.starts_with(&base) {
         return Err("Image is outside the document folder".into());
     }
-    let mime = match image.extension().and_then(|ext| ext.to_str()).unwrap_or("").to_ascii_lowercase().as_str() {
+    let mime = match image
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase()
+        .as_str()
+    {
         "png" => "image/png",
         "jpg" | "jpeg" => "image/jpeg",
         "gif" => "image/gif",
         "webp" => "image/webp",
         _ => return Err("Unsupported image type".into()),
     };
-    let size = std::fs::metadata(&image).map_err(|error| error.to_string())?.len();
+    let size = std::fs::metadata(&image)
+        .map_err(|error| error.to_string())?
+        .len();
     if size > MAX_IMAGE_BYTES {
         return Err("Image exceeds the 8 MB limit".into());
     }
     let encoded = STANDARD.encode(std::fs::read(image).map_err(|error| error.to_string())?);
     Ok(format!("data:{mime};base64,{encoded}"))
+}
+
+#[tauri::command]
+async fn prepare_update(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    let updater = app.updater().map_err(|error| error.to_string())?;
+    let Some(update) = updater.check().await.map_err(|error| error.to_string())? else {
+        return Ok(None);
+    };
+
+    let bytes = update
+        .download(|_, _| {}, || {})
+        .await
+        .map_err(|error| error.to_string())?;
+    let version = update.version.clone();
+    let ready = app.state::<ReadyUpdate>();
+    *ready.0.lock().map_err(|error| error.to_string())? = Some((update, bytes));
+    Ok(Some(version))
+}
+
+#[tauri::command]
+fn install_update(state: State<'_, ReadyUpdate>) -> Result<(), String> {
+    let mut ready = state.0.lock().map_err(|error| error.to_string())?;
+    let (update, bytes) = ready.as_ref().ok_or("No update has been downloaded")?;
+    update.install(bytes).map_err(|error| error.to_string())?;
+    *ready = None;
+    Ok(())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -91,12 +143,16 @@ pub fn run() {
         .find(|path| is_markdown(path));
     tauri::Builder::default()
         .manage(StartupFile(startup_file))
+        .manage(ReadyUpdate(Mutex::new(None)))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             startup_document,
             read_document,
-            read_relative_image
+            read_relative_image,
+            prepare_update,
+            install_update
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Markdown Viewer");

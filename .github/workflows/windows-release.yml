@@ -25,12 +25,28 @@ jobs:
       - name: Browser smoke test
         run: npm run test:smoke
       - name: Build Windows installer
+        if: github.ref == 'refs/heads/main'
         run: npm run desktop:build
+      - name: Build signed release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: ./scripts/build-release.ps1 -UseEnvironmentKey
       - name: Upload installer artifact
+        if: github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@v4
         with:
           name: markdown-viewer-windows
           path: src-tauri/target/release/bundle/nsis/*-setup.exe
+          if-no-files-found: error
+      - name: Save signed assets for verification
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: signed-windows-release
+          path: .release/v*/*
+          include-hidden-files: true
           if-no-files-found: error
       - name: Publish tagged release
         if: startsWith(github.ref, 'refs/tags/v')
@@ -40,7 +56,8 @@ jobs:
         run: |
           gh release view $env:GITHUB_REF_NAME --repo $env:GITHUB_REPOSITORY *> $null
           if ($LASTEXITCODE -eq 0) {
-            gh release upload $env:GITHUB_REF_NAME src-tauri/target/release/bundle/nsis/*-setup.exe --repo $env:GITHUB_REPOSITORY --clobber
-          } else {
-            gh release create $env:GITHUB_REF_NAME src-tauri/target/release/bundle/nsis/*-setup.exe --repo $env:GITHUB_REPOSITORY --title "Markdown Viewer $env:GITHUB_REF_NAME" --generate-notes
+            throw "Release $env:GITHUB_REF_NAME already exists."
           }
+          $assets = Get-ChildItem -LiteralPath ".release/$env:GITHUB_REF_NAME" -File | Select-Object -ExpandProperty FullName
+          gh release create $env:GITHUB_REF_NAME $assets --repo $env:GITHUB_REPOSITORY --title "Markdown Viewer $env:GITHUB_REF_NAME" --generate-notes --latest
+          if ($LASTEXITCODE -ne 0) { throw 'Could not publish the release.' }

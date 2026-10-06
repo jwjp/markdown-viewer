@@ -6,7 +6,11 @@
   const invoke = window.__TAURI__?.core?.invoke;
   const words = {
     en: {
-      private: 'Local only', theme: 'Toggle theme', open: 'Open file', preview: 'Preview', source: 'Source',
+      private: 'Files stay local', theme: 'Toggle theme', open: 'Open file', preview: 'Preview', source: 'Source',
+      checkUpdates: 'Check for updates', checkingUpdates: 'Checking…', updateAvailable: 'Version {version} is ready to install.',
+      installUpdate: 'Install update', installingUpdate: 'Installing the update…', noUpdate: 'You have the latest version.',
+      updateFailed: 'Could not check for updates. Check your connection and try again.',
+      installFailed: 'The update could not be installed. Please try again.', dismissUpdate: 'Dismiss update notice',
       search: 'Find in document', outline: 'Outline', onThisPage: 'On this page', eyebrow: 'A clear place to read',
       welcomeTitle: 'Your Markdown, beautifully readable.', welcomeCopy: 'Open a .md file or drop it here. Your document stays on this device.',
       choose: 'Choose a Markdown file', formats: 'Supports .md and .markdown · UTF-8 · Up to 10 MB',
@@ -15,7 +19,11 @@
       noMatches: 'No matches', imageUnavailable: 'Image unavailable', words: 'words', lines: 'lines'
     },
     ko: {
-      private: '내 기기에서만', theme: '테마 전환', open: '파일 열기', preview: '미리보기', source: '원문',
+      private: '파일은 내 기기에', theme: '테마 전환', open: '파일 열기', preview: '미리보기', source: '원문',
+      checkUpdates: '업데이트 확인', checkingUpdates: '확인 중…', updateAvailable: '버전 {version} 업데이트를 설치할 수 있습니다.',
+      installUpdate: '업데이트 설치', installingUpdate: '업데이트를 설치하는 중…', noUpdate: '최신 버전입니다.',
+      updateFailed: '업데이트를 확인할 수 없습니다. 연결을 확인하고 다시 시도하세요.',
+      installFailed: '업데이트를 설치하지 못했습니다. 다시 시도하세요.', dismissUpdate: '업데이트 알림 닫기',
       search: '문서에서 찾기', outline: '목차', onThisPage: '이 문서의 목차', eyebrow: '읽기에 집중하는 공간',
       welcomeTitle: '마크다운을 편안하게 읽으세요.', welcomeCopy: '.md 파일을 열거나 여기에 끌어 놓으세요. 문서는 기기 밖으로 전송되지 않습니다.',
       choose: '마크다운 파일 선택', formats: '.md 및 .markdown · UTF-8 · 최대 10 MB',
@@ -34,6 +42,9 @@
   let markIndex = -1;
   let toastTimer;
   let dragDepth = 0;
+  let updateBusy = false;
+  let updateVersion = null;
+  let updateMessageKey = null;
 
   const markdown = window.markdownit({ html: false, linkify: true, typographer: false });
   markdown.core.ruler.after('inline', 'task-list', (state) => {
@@ -96,6 +107,61 @@
     });
     document.querySelectorAll('[data-i18n-placeholder]').forEach((element) => { element.placeholder = t(element.dataset.i18nPlaceholder); });
     if (documentData) { buildOutline(); updateFooter(); updateSearchCount(); }
+    refreshUpdateUi();
+  }
+
+  function refreshUpdateUi() {
+    $('updateCheckButton').textContent = t(updateBusy && updateMessageKey !== 'installingUpdate' ? 'checkingUpdates' : 'checkUpdates');
+    if (updateMessageKey) {
+      $('updateMessage').textContent = t(updateMessageKey).replace('{version}', updateVersion || '');
+    }
+  }
+
+  async function prepareUpdate(manual = false) {
+    if (!desktop || updateBusy) return;
+    updateBusy = true;
+    $('updateCheckButton').disabled = true;
+    refreshUpdateUi();
+    try {
+      const version = await invoke('prepare_update');
+      updateVersion = version;
+      if (version) {
+        updateMessageKey = 'updateAvailable';
+        $('updateInstallButton').hidden = false;
+        $('updateBanner').hidden = false;
+      } else {
+        updateMessageKey = null;
+        $('updateBanner').hidden = true;
+        $('updateInstallButton').hidden = true;
+        if (manual) showToast(t('noUpdate'));
+      }
+    } catch (error) {
+      console.error('Update check failed:', error);
+      if (manual) showToast(t('updateFailed'));
+    } finally {
+      updateBusy = false;
+      $('updateCheckButton').disabled = false;
+      refreshUpdateUi();
+    }
+  }
+
+  async function installUpdate() {
+    if (!desktop || updateBusy || !updateVersion) return;
+    updateBusy = true;
+    updateMessageKey = 'installingUpdate';
+    $('updateCheckButton').disabled = true;
+    $('updateInstallButton').disabled = true;
+    refreshUpdateUi();
+    try {
+      await invoke('install_update');
+    } catch (error) {
+      console.error('Update installation failed:', error);
+      updateMessageKey = 'installFailed';
+      updateBusy = false;
+      $('updateCheckButton').disabled = false;
+      $('updateInstallButton').disabled = false;
+      refreshUpdateUi();
+    }
   }
 
   function setTheme(value) {
@@ -315,6 +381,9 @@
   }
 
   $('openButton').addEventListener('click', chooseFile);
+  $('updateCheckButton').addEventListener('click', () => prepareUpdate(true));
+  $('updateInstallButton').addEventListener('click', installUpdate);
+  $('updateDismissButton').addEventListener('click', () => { $('updateBanner').hidden = true; });
   $('welcomeOpenButton').addEventListener('click', chooseFile);
   $('fileInput').addEventListener('change', (event) => { openBrowserFile(event.target.files?.[0]); event.target.value = ''; });
   $('languageSelect').addEventListener('change', (event) => setLanguage(event.target.value));
@@ -348,5 +417,9 @@
 
   setTheme(localStorage.getItem('markdown-viewer-theme') === 'dark' ? 'dark' : 'light');
   setLanguage(language);
-  if (desktop) invoke('startup_document').then((data) => { if (data) renderDocument(data); }).catch((error) => showToast(String(error)));
+  if (desktop) {
+    $('updateCheckButton').hidden = false;
+    invoke('startup_document').then((data) => { if (data) renderDocument(data); }).catch((error) => showToast(String(error)));
+    prepareUpdate();
+  }
 })();

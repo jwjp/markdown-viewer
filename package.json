@@ -1,14 +1,15 @@
 {
   "name": "markdown-viewer",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Offline, read-only Markdown viewer for Windows and the web",
   "scripts": {
     "vendor": "node scripts/copy-vendor.mjs",
     "test:smoke": "node tests/smoke.mjs",
     "tauri": "tauri",
     "desktop:dev": "tauri dev",
-    "desktop:build": "tauri build"
+    "desktop:build": "tauri build --config src-tauri/tauri.local.conf.json",
+    "desktop:build:release": "tauri build"
   },
   "devDependencies": {
     "@tauri-apps/cli": "2.11.5",

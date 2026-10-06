@@ -21,7 +21,8 @@
         </a>
         <span class="file-name" id="fileName" aria-live="polite"></span>
         <div class="top-actions">
-          <span class="local-badge" data-i18n="private">Local only</span>
+          <span class="local-badge" data-i18n="private">Files stay local</span>
+          <button class="update-check" id="updateCheckButton" type="button" data-i18n="checkUpdates" hidden>Check for updates</button>
           <button class="icon-button" id="themeButton" type="button" data-i18n-title="theme" aria-label="Toggle theme" title="Toggle theme">◐</button>
           <select id="languageSelect" aria-label="Language">
             <option value="en">English</option>
@@ -30,6 +31,12 @@
           <button class="primary-button" id="openButton" type="button" data-i18n="open">Open file</button>
         </div>
       </header>
+
+      <div class="update-banner" id="updateBanner" role="status" aria-live="polite" hidden>
+        <span id="updateMessage"></span>
+        <button class="primary-button" id="updateInstallButton" type="button" data-i18n="installUpdate" hidden>Install update</button>
+        <button class="update-dismiss" id="updateDismissButton" type="button" data-i18n-title="dismissUpdate" aria-label="Dismiss update notice" title="Dismiss update notice">×</button>
+      </div>
 
       <div class="toolbar" id="toolbar" hidden>
         <div class="view-switch" role="group" aria-label="View mode">

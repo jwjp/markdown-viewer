@@ -17,8 +17,15 @@ The installer is currently unsigned, so Windows SmartScreen may display a warnin
 - Switch between light and dark themes and English and Korean
 - Open a file through the picker, drag and drop, or Windows Explorer
 - Read documents offline with no account or telemetry
+- Check for a new Windows version and install a verified update in the app
 
 Raw HTML in Markdown is displayed as text. Remote images are not loaded. Local PNG, JPEG, GIF, and WebP images are available in the Windows app when they are inside the opened document's folder. Browser file selection cannot grant access to neighboring image files, so it shows image alt text instead. Files must be UTF-8 and at most 10 MB; local images are limited to 8 MB each.
+
+## App updates
+
+The installed Windows app checks GitHub Releases when it starts. **Check for updates** runs another check. When a newer version is available, the app downloads it, verifies its update signature, and offers **Install update**. The Windows installer completes the update and restarts the app. Markdown files remain on your device; the update check contacts GitHub but does not upload documents.
+
+Version 0.1.0 did not include the updater. Install version 0.1.1 or later once from GitHub Releases to enable in-app updates for subsequent releases. Update signatures are separate from Windows code signing; SmartScreen may still warn about the unsigned installer.
 
 ## Browser version
 
@@ -37,7 +44,13 @@ npm ci
 npm run desktop:build
 ```
 
-The NSIS installer is written to `src-tauri/target/release/bundle/nsis/`. `npm run vendor` refreshes the committed browser bundles after updating dependencies. `python scripts/generate-icons.py` regenerates icons if Pillow is installed.
+The NSIS installer is written to `src-tauri/target/release/bundle/nsis/`. This local build does not create an update signature. `npm run vendor` refreshes the committed browser bundles after updating dependencies. `python scripts/generate-icons.py` regenerates icons if Pillow is installed.
+
+## Publish an update
+
+Keep the version in `package.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json` identical. The update signing public key is committed in the Tauri configuration. The private key is stored outside this repository at `%USERPROFILE%\.tauri\markdown-viewer.key` and as the `TAURI_SIGNING_PRIVATE_KEY` GitHub Actions secret. Back up the private key securely: losing it prevents existing installations from trusting future updates. Do not commit it.
+
+Run `./scripts/build-release.ps1` for a signed local build, or push a `v<version>` tag to trigger the Windows release workflow. The workflow publishes the installer, `.sig`, `latest.json`, and SHA-256 checksum to GitHub Releases. The app reads `latest.json` from the latest release.
 
 ## Development
 
