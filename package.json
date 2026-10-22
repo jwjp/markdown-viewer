@@ -14,7 +14,7 @@
   "devDependencies": {
     "@tauri-apps/cli": "2.11.5",
     "dompurify": "3.4.16",
-    "markdown-it": "14.3.2",
+    "markdown-it": "14.3.3",
     "playwright-core": "1.63.0"
   }
 }
