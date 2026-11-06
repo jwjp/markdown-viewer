@@ -71,6 +71,7 @@ jobs:
           if ($LASTEXITCODE -eq 0) {
             throw "Release $env:GITHUB_REF_NAME already exists."
           }
-          $assets = Get-ChildItem -LiteralPath 'release-assets' -File | Select-Object -ExpandProperty FullName
+          $assets = @(Get-ChildItem -LiteralPath "release-assets/$env:GITHUB_REF_NAME" -File | Select-Object -ExpandProperty FullName)
+          if ($assets.Count -ne 4) { throw "Expected 4 release assets; found $($assets.Count)." }
           gh release create $env:GITHUB_REF_NAME $assets --repo $env:GITHUB_REPOSITORY --title "Markdown Viewer $env:GITHUB_REF_NAME" --generate-notes --latest
           if ($LASTEXITCODE -ne 0) { throw 'Could not publish the release.' }
