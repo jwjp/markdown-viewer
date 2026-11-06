@@ -1,7 +1,7 @@
 {
   "name": "markdown-viewer",
   "private": true,
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Offline, read-only Markdown viewer for Windows and the web",
   "scripts": {
     "vendor": "node scripts/copy-vendor.mjs",
